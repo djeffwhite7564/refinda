@@ -1,0 +1,33 @@
+
+[functions.recommend-jeans]
+enabled = true
+verify_jwt = false
+import_map = "./functions/recommend-jeans/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/recommend-jeans/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/recommend-jeans/*.html" ]
+
+[functions.taste-update]
+enabled = true
+verify_jwt = true
+import_map = "./functions/taste-update/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/taste-update/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/taste-update/*.html" ]
+
+[functions.admin-sign-asset]
+enabled = true
+verify_jwt = true
+import_map = "./functions/admin-sign-asset/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/admin-sign-asset/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/admin-sign-asset/*.html" ]
