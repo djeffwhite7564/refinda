@@ -84,6 +84,8 @@ type ProfileLite = {
   inseam: number | null;
 };
 
+type Toast = { id: number; text: string };
+
 let sessionReadPromise: Promise<string> | null = null;
 
 async function getAccessTokenSafe(
@@ -101,7 +103,6 @@ async function getAccessTokenSafe(
       sessionReadPromise = null;
     });
   }
-
   return sessionReadPromise;
 }
 
@@ -165,7 +166,7 @@ function confidencePercentChip(score?: number): { text: string; className: strin
   return {
     text: `${p}% match`,
     className: `${base} bg-amber-50 border-amber-200 text-amber-900`,
-  };
+    };
 }
 
 function pickTypeChip(
@@ -284,6 +285,12 @@ function prettyEraLine(raw?: string) {
   return prettyFromKey(raw);
 }
 
+function actionToastText(action: FeedbackAction): string {
+  if (action === "save") return "Saved — we’ll show you more like this.";
+  if (action === "not_for_me") return "Noted — we’ll avoid this direction.";
+  return "Nice — purchases teach the fastest.";
+}
+
 export default function ResultsClient() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
@@ -294,8 +301,8 @@ export default function ResultsClient() {
   const [feedbackBusy, setFeedbackBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ toast
-  const [toast, setToast] = useState<string | null>(null);
+  // ✅ toast with nonce
+  const [toast, setToast] = useState<Toast | null>(null);
 
   const [feedbackByIndex, setFeedbackByIndex] = useState<Record<number, FeedbackAction>>({});
 
@@ -308,12 +315,15 @@ export default function ResultsClient() {
   const [profileLoaded, setProfileLoaded] = useState(false);
   const didHydrateInputs = useRef(false);
 
+  const recs = output?.recommendations ?? [];
+  const anchorIndex = output?.anchor_index ?? null;
+
   // ✅ auto-dismiss toast
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(t);
-  }, [toast]);
+  }, [toast?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -360,12 +370,7 @@ export default function ResultsClient() {
       const token = await getAccessTokenSafe(supabase);
 
       // If vibe is blank, do NOT send it (falls back to profiles.vibe_default)
-      const payload: {
-        vibe?: string;
-        size?: string;
-        budget?: number;
-        debug?: boolean;
-      } = { debug };
+      const payload: { vibe?: string; size?: string; budget?: number; debug?: boolean } = { debug };
 
       const vibeTrim = vibe.trim();
       const sizeTrim = size.trim();
@@ -375,8 +380,6 @@ export default function ResultsClient() {
       if (isFiniteNumber(budget)) payload.budget = budget;
 
       const json = await callEdgeFunction<Output>("recommend-jeans", token, payload);
-
-      console.log("recommend-jeans RAW:", json);
 
       setOutput(json);
       if (json.run_id) setRunId(json.run_id);
@@ -390,7 +393,7 @@ export default function ResultsClient() {
       if (typeof usedSize === "string" && usedSize.trim()) setSize(usedSize);
       if (typeof usedBudget === "number" && Number.isFinite(usedBudget)) setBudget(usedBudget);
 
-      setToast("New picks generated.");
+      setToast({ id: Date.now(), text: "New picks generated." });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
@@ -422,7 +425,8 @@ export default function ResultsClient() {
           .delete()
           .eq("run_id", rid)
           .eq("user_id", uid)
-          .eq("rec_index", recIndex);
+          .eq("rec_index", recIndex)
+          .eq("action", nextAction);
 
         if (delErr) throw delErr;
 
@@ -432,7 +436,7 @@ export default function ResultsClient() {
           return copy;
         });
 
-        setToast("Undone.");
+        setToast({ id: Date.now(), text: "Undone." });
         return;
       }
 
@@ -440,22 +444,22 @@ export default function ResultsClient() {
         .from("recommendation_feedback")
         .upsert(
           { run_id: rid, user_id: uid, rec_index: recIndex, action: nextAction },
-          { onConflict: "run_id,user_id,rec_index" }
+          { onConflict: "run_id,user_id,rec_index,action" }
         );
 
       if (upErr) throw upErr;
 
       setFeedbackByIndex((m) => ({ ...m, [recIndex]: nextAction }));
 
+      // ✅ show fly-over immediately (guaranteed rerender via nonce)
+      setToast({ id: Date.now(), text: actionToastText(nextAction) });
+
+      // then update taste (if this fails, UI still shows feedback)
       await callEdgeFunction("taste-update", token, {
         run_id: rid,
         rec_index: recIndex,
         action: nextAction,
       });
-
-      if (nextAction === "save") setToast("Saved — we’ll show you more like this.");
-      if (nextAction === "not_for_me") setToast("Noted — we’ll avoid this direction.");
-      if (nextAction === "bought") setToast("Nice — purchases teach the fastest.");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
@@ -463,12 +467,6 @@ export default function ResultsClient() {
       setFeedbackBusy(false);
     }
   }
-
-  const recs = output?.recommendations ?? [];
-
-  const anchorIndex = useMemo(() => {
-    return output?.anchor_index ?? null;
-  }, [output?.anchor_index]);
 
   function btnClass(selected: boolean, selectedClass: string) {
     return `rounded-xl px-3 py-2 text-sm transition border disabled:opacity-60 ${
@@ -478,19 +476,20 @@ export default function ResultsClient() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
-      {/* ✅ Toast (fixed position so it's visible) */}
+      {/* ✅ Toast (fly-over) */}
       {toast && (
-        <div className="fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full border bg-white px-4 py-2 text-sm shadow-lg">
-          {toast}
+        <div
+          aria-live="polite"
+          className="fixed left-1/2 top-6 z-[9999] -translate-x-1/2 rounded-full border bg-white px-4 py-2 text-sm shadow-lg"
+        >
+          {toast.text}
         </div>
       )}
 
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Search Picks</h1>
-          <p className="mt-2 text-gray-600">
-            Curated to Your Vibe. Denim That Gets You!
-          </p>
+          <p className="mt-2 text-gray-600">Curated to Your Vibe. Denim That Gets You!</p>
         </div>
 
         <button
@@ -545,8 +544,7 @@ export default function ResultsClient() {
               onChange={(e) => {
                 const next = e.target.value.trim();
                 if (next === "") return setBudget(NaN);
-                const n = Number(next);
-                setBudget(n);
+                setBudget(Number(next));
               }}
               inputMode="numeric"
               placeholder="150"
@@ -642,7 +640,6 @@ export default function ResultsClient() {
               <div key={i} className="rounded-2xl border p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    {/* ✅ prevent chips from wrapping onto new lines */}
                     <div className="flex items-center gap-2">
                       <h2 className="text-lg font-semibold">
                         {rec.brand} — {rec.model}
@@ -654,9 +651,7 @@ export default function ResultsClient() {
                       </div>
                     </div>
 
-                    <p className="mt-1 text-sm text-gray-600">
-                      {prettyEraLine(rec.era_inspiration)}
-                    </p>
+                    <p className="mt-1 text-sm text-gray-600">{prettyEraLine(rec.era_inspiration)}</p>
 
                     {(inspiredBy || anchorWhy) && (
                       <div className="mt-3 space-y-1">
@@ -666,9 +661,7 @@ export default function ResultsClient() {
                             <span className="text-gray-700">{inspiredBy}</span>
                           </div>
                         )}
-                        {anchorWhy && (
-                          <div className="text-sm text-gray-700 line-clamp-2">{anchorWhy}</div>
-                        )}
+                        {anchorWhy && <div className="text-sm text-gray-700 line-clamp-2">{anchorWhy}</div>}
                       </div>
                     )}
                   </div>
@@ -738,8 +731,6 @@ export default function ResultsClient() {
                   >
                     🛒 Bought
                   </button>
-
-                  {/* ✅ Remove the dev-y inline selected text; toast + button styles are enough */}
                 </div>
               </div>
             );
@@ -751,5 +742,3 @@ export default function ResultsClient() {
     </main>
   );
 }
-
-
