@@ -14,6 +14,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [displayName, setDisplayName] = useState("");
+
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -38,9 +40,23 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      if (mode === "signup" && !displayName.trim()) {
+        setMessage("Display name is required.");
+        setLoading(false);
+        return;
+      }
+
       const res =
         mode === "signup"
-          ? await supabase.auth.signUp({ email, password })
+          ? await supabase.auth.signUp({
+              email,
+              password,
+              options: {
+                data: {
+                  display_name: displayName.trim(),
+                },
+              },
+            })
           : await supabase.auth.signInWithPassword({ email, password });
 
       if (res.error) {
@@ -54,7 +70,6 @@ export default function LoginPage() {
         return;
       }
 
-      // ✅ Don’t immediately re-check getSession(); it can race.
       router.replace("/vibe");
       router.refresh();
     } catch (e: unknown) {
@@ -72,16 +87,26 @@ export default function LoginPage() {
       <div className="mt-6 flex gap-2">
         <button
           type="button"
-          onClick={() => setMode("signin")}
-          className={`flex-1 rounded-lg px-4 py-2 ${mode === "signin" ? "bg-black text-white" : "border"}`}
+          onClick={() => {
+            setMode("signin");
+            setMessage(null);
+          }}
+          className={`flex-1 rounded-lg px-4 py-2 ${
+            mode === "signin" ? "bg-black text-white" : "border"
+          }`}
         >
           Sign in
         </button>
 
         <button
           type="button"
-          onClick={() => setMode("signup")}
-          className={`flex-1 rounded-lg px-4 py-2 ${mode === "signup" ? "bg-black text-white" : "border"}`}
+          onClick={() => {
+            setMode("signup");
+            setMessage(null);
+          }}
+          className={`flex-1 rounded-lg px-4 py-2 ${
+            mode === "signup" ? "bg-black text-white" : "border"
+          }`}
         >
           Create account
         </button>
@@ -96,6 +121,18 @@ export default function LoginPage() {
       </button>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        {mode === "signup" && (
+          <input
+            className="w-full rounded-lg border px-4 py-3"
+            placeholder="Display name"
+            type="text"
+            required
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            autoComplete="name"
+          />
+        )}
+
         <input
           className="w-full rounded-lg border px-4 py-3"
           placeholder="Email"
@@ -105,6 +142,7 @@ export default function LoginPage() {
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
         />
+
         <input
           className="w-full rounded-lg border px-4 py-3"
           placeholder="Password (min 8 chars)"
@@ -115,6 +153,7 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
           autoComplete={mode === "signup" ? "new-password" : "current-password"}
         />
+
         <button
           disabled={loading}
           className="w-full rounded-lg bg-black px-4 py-3 font-semibold text-white disabled:opacity-60"
