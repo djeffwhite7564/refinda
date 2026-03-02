@@ -150,7 +150,7 @@ export default function OnboardingClient({ initialProfile }: { initialProfile: I
 
       if (upsertErr) throw upsertErr;
 
-      router.push("/app/recommend-test");
+      router.push("/app/results");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
       setError(message);
