@@ -1,3 +1,4 @@
+// src/app/results/layout.tsx
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -21,14 +22,13 @@ export default async function ResultsLayout({
     .eq("id", user.id)
     .maybeSingle();
 
-  const needsOnboarding =
-    !!profileErr ||
-    !profile ||
-    !profile.aesthetic_archetype ||
-    !profile.fit_preference ||
-    !profile.vibe_default;
+  if (profileErr || !profile) redirect("/onboarding");
 
-  if (needsOnboarding) redirect("/onboarding");
+  if (!profile.vibe_default) redirect("/vibe");
+
+  if (!profile.aesthetic_archetype || !profile.fit_preference) {
+    redirect("/onboarding");
+  }
 
   return <>{children}</>;
 }

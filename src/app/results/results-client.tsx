@@ -487,7 +487,7 @@ export default function ResultsClient() {
 
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Results</h1>
+          <h1 className="text-3xl font-bold">Search Picks</h1>
           <p className="mt-2 text-gray-600">
             Curated to Your Vibe. Denim That Gets You!
           </p>

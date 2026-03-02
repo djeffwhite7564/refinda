@@ -71,7 +71,7 @@ export default function VibePicker({
 
       if (upErr) throw upErr;
 
-      router.push("/fit");
+      router.push("/onboarding");
       router.refresh();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -154,7 +154,7 @@ export default function VibePicker({
             disabled={saving}
             className="rounded-xl bg-black px-6 py-3 font-semibold text-white disabled:opacity-60"
           >
-            {saving ? "Saving..." : "Continue to Fit"}
+            {saving ? "Saving..." : "Continue"}
           </button>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

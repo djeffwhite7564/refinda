@@ -75,17 +75,17 @@ export default function AppNav() {
           </Link>
 
           <div className="hidden md:flex items-center gap-2">
+            <Link href="/vibe" className={navClass("/vibe")}>
+              Style Curator
+            </Link>           
             <Link href="/results" className={navClass("/results")}>
-              Results
+              Search Picks
             </Link>
-
             <Link href="/style-profile" className={navClass("/style-profile")}>
               Style DNA
             </Link>
 
-            <Link href="/vibe" className={navClass("/vibe")}>
-              Refine
-            </Link>
+
 
             <Link href="/inspiration" className={navClass("/inspiration")}>
               Inspiration
