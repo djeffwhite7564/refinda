@@ -12,22 +12,57 @@ export default function AppNav() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase
+    let alive = true;
+
+    async function loadAdminFlag() {
+      // 1) Get current signed-in user
+      const {
+        data: { user },
+        error: userErr,
+      } = await supabase.auth.getUser();
+
+      if (!alive) return;
+
+      if (userErr || !user) {
+        setIsAdmin(false);
+        return;
+      }
+
+      // 2) Fetch THIS user's profile row
+      const { data: profile, error: profErr } = await supabase
         .from("profiles")
         .select("is_admin")
-        .maybeSingle();
+        .eq("id", user.id)
+        .single();
 
-      setIsAdmin(Boolean(data?.is_admin));
-    })();
+      if (!alive) return;
+
+      if (profErr) {
+        // If RLS blocks or profile missing, default to false
+        setIsAdmin(false);
+        return;
+      }
+
+      setIsAdmin(Boolean(profile?.is_admin));
+    }
+
+    loadAdminFlag();
+
+    // 3) Keep in sync on login/logout/refresh token
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      loadAdminFlag();
+    });
+
+    return () => {
+      alive = false;
+      sub?.subscription?.unsubscribe();
+    };
   }, [supabase]);
 
   function navClass(href: string) {
     const active = pathname.startsWith(href);
     return `px-4 py-2 rounded-full text-sm transition ${
-      active
-        ? "bg-black text-white"
-        : "text-gray-700 hover:bg-gray-100"
+      active ? "bg-black text-white" : "text-gray-700 hover:bg-gray-100"
     }`;
   }
 
