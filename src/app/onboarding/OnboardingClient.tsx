@@ -142,10 +142,23 @@ export default function OnboardingClient({ initialProfile }: { initialProfile: I
         throw new Error("Inseam must be a valid number.");
       }
 
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+
+      const user = userData.user;
+      if (!user) throw new Error("No authenticated user.");
+
+const displayName =
+  (typeof user.user_metadata?.display_name === "string"
+    ? user.user_metadata.display_name.trim()
+    : "") ||
+  (user.email ? user.email.split("@")[0] : "User");
+
       // Onboarding owns archetype + fit + constraints.
       // Vibe is handled separately on /vibe and should not be overwritten here.
       const payload = {
         id: draft.id,
+        display_name: displayName,
         aesthetic_archetype: draft.aesthetic_archetype,
 
         fit_preference: draft.fit_preference,
@@ -165,7 +178,10 @@ export default function OnboardingClient({ initialProfile }: { initialProfile: I
         .from("profiles")
         .upsert(payload, { onConflict: "id" });
 
-      if (upsertErr) throw upsertErr;
+      if (upsertErr) {
+  console.error("profiles upsert error:", upsertErr);
+  throw upsertErr;
+}
 
       router.push("/results");
     } catch (e: unknown) {
